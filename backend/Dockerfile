@@ -3,11 +3,11 @@ FROM python:3.13-slim
 
 COPY --from=ghcr.io/astral-sh/uv:0.9 /uv /usr/local/bin/uv
 
-# UV_NATIVE_TLS makes uv use the system trust store, so an extra CA added
+# UV_SYSTEM_CERTS makes uv use the system trust store, so an extra CA added
 # below (for a TLS-intercepting proxy, as in Claude Code cloud sessions) works.
 ENV UV_COMPILE_BYTECODE=1 \
     UV_LINK_MODE=copy \
-    UV_NATIVE_TLS=1 \
+    UV_SYSTEM_CERTS=1 \
     UV_PROJECT_ENVIRONMENT=/opt/venv \
     PATH="/opt/venv/bin:$PATH" \
     PYTHONUNBUFFERED=1
