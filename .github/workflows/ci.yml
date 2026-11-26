@@ -1,0 +1,68 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+
+    services:
+      postgres:
+        image: postgres:17
+        env:
+          POSTGRES_USER: postgres
+          POSTGRES_PASSWORD: postgres
+        ports: ["5433:5432"]
+        options: >-
+          --health-cmd "pg_isready -U postgres"
+          --health-interval 3s --health-timeout 3s --health-retries 20
+      clickhouse:
+        image: clickhouse/clickhouse-server:25.8
+        env:
+          CLICKHOUSE_USER: wap
+          CLICKHOUSE_PASSWORD: wap_dev
+          CLICKHOUSE_DB: wap
+          CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+        ports: ["8123:8123"]
+        options: >-
+          --health-cmd "wget -qO- http://localhost:8123/ping || exit 1"
+          --health-interval 3s --health-timeout 3s --health-retries 20
+
+    env:
+      WAP_TEST_DATABASE_URL: postgresql://wap_app:wap_app_dev@localhost:5433/wap_test
+      WAP_TEST_MIGRATION_DATABASE_URL: postgresql://wap_owner:wap_owner_dev@localhost:5433/wap_test
+      WAP_CLICKHOUSE_HOST: localhost
+      WAP_CLICKHOUSE_PASSWORD: wap_dev
+
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          python-version: "3.13"
+
+      - name: Prepare Postgres (same script as docker-compose)
+        working-directory: .
+        env:
+          PGHOST: localhost
+          PGPORT: "5433"
+          PGPASSWORD: postgres
+          POSTGRES_USER: postgres
+          WAP_OWNER_PASSWORD: wap_owner_dev
+          WAP_APP_PASSWORD: wap_app_dev
+        run: bash docker/postgres/init/01-roles-and-databases.sh
+
+      - run: uv sync --frozen
+
+      - name: Prepare ClickHouse (same SQL as docker-compose)
+        run: uv run python -m wap.cli.ch_init ../docker/clickhouse/init/01-schema.sql
+
+      - run: uv run ruff check .
+      - run: uv run ruff format --check .
+      - run: uv run pyright
+      - run: uv run pytest -v

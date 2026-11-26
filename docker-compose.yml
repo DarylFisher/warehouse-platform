@@ -1,0 +1,88 @@
+name: wap
+
+services:
+  postgres:
+    # Keep the major version in step with ClickHouse Managed Postgres in production.
+    image: postgres:17
+    command: >
+      postgres
+      -c wal_level=logical
+      -c max_replication_slots=10
+      -c max_wal_senders=10
+      -c max_slot_wal_keep_size=2GB
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:-postgres}
+      WAP_OWNER_PASSWORD: ${WAP_OWNER_PASSWORD:-wap_owner_dev}
+      WAP_APP_PASSWORD: ${WAP_APP_PASSWORD:-wap_app_dev}
+    ports: ["5433:5432"]
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+      - ./docker/postgres/init:/docker-entrypoint-initdb.d:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres -d wap"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  clickhouse:
+    image: clickhouse/clickhouse-server:25.8
+    environment:
+      CLICKHOUSE_USER: wap
+      CLICKHOUSE_PASSWORD: ${WAP_CLICKHOUSE_PASSWORD:-wap_dev}
+      CLICKHOUSE_DB: wap
+      CLICKHOUSE_DEFAULT_ACCESS_MANAGEMENT: "1"
+    ports:
+      - "8123:8123"
+      - "9002:9000"
+    volumes:
+      - chdata:/var/lib/clickhouse
+      - ./docker/clickhouse/init:/docker-entrypoint-initdb.d:ro
+    ulimits:
+      nofile: { soft: 262144, hard: 262144 }
+    healthcheck:
+      test: ["CMD-SHELL", "wget -qO- http://localhost:8123/ping || exit 1"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+
+  keycloak:
+    image: quay.io/keycloak/keycloak:26.4
+    command: ["start-dev", "--import-realm", "--http-port=8080"]
+    environment:
+      KC_BOOTSTRAP_ADMIN_USERNAME: admin
+      KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+    ports: ["8180:8080"]
+    volumes:
+      - ./docker/keycloak:/opt/keycloak/data/import:ro
+
+  # One-shot: applies kernel migrations as the schema owner, then exits.
+  migrate:
+    build: ./backend
+    command: ["alembic", "upgrade", "head"]
+    environment: &backend-env
+      WAP_DATABASE_URL: postgresql://wap_app:${WAP_APP_PASSWORD:-wap_app_dev}@postgres:5432/wap
+      WAP_MIGRATION_DATABASE_URL: postgresql://wap_owner:${WAP_OWNER_PASSWORD:-wap_owner_dev}@postgres:5432/wap
+      WAP_CLICKHOUSE_HOST: clickhouse
+      WAP_CLICKHOUSE_PORT: "8123"
+      WAP_CLICKHOUSE_USER: wap
+      WAP_CLICKHOUSE_PASSWORD: ${WAP_CLICKHOUSE_PASSWORD:-wap_dev}
+      WAP_CLICKHOUSE_DATABASE: wap
+    depends_on:
+      postgres: { condition: service_healthy }
+    restart: "no"
+
+  api:
+    build: ./backend
+    command: ["uvicorn", "wap.api.main:app", "--host", "0.0.0.0", "--port", "8100", "--reload", "--reload-dir", "/app/src"]
+    environment: *backend-env
+    ports: ["8100:8100"]
+    volumes:
+      - ./backend/src:/app/src
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      clickhouse: { condition: service_healthy }
+
+volumes:
+  pgdata:
+  chdata:
