@@ -4,7 +4,9 @@
 # selector > settings). Runs as root on Ubuntu 24.04 before Claude starts; the
 # resulting filesystem is cached, so keep it under about five minutes.
 #
-# Network access: Custom, default list included, plus quay.io (Keycloak image).
+# Network access: Custom, default list included, plus:
+#   quay.io, cdn01.quay.io, cdn02.quay.io, cdn03.quay.io   (Keycloak image)
+#   ghcr.io, pkg-containers.githubusercontent.com          (uv image)
 
 command -v uv >/dev/null || pip install --break-system-packages uv || true
 command -v just >/dev/null || uv tool install rust-just || true

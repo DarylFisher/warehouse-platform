@@ -41,8 +41,8 @@ jobs:
       WAP_CLICKHOUSE_PASSWORD: wap_dev
 
     steps:
-      - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v6
+      - uses: actions/checkout@v5
+      - uses: astral-sh/setup-uv@v7
         with:
           python-version: "3.13"
 
@@ -66,3 +66,16 @@ jobs:
       - run: uv run ruff format --check .
       - run: uv run pyright
       - run: uv run pytest -v
+
+  image:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v5
+      - name: Build the backend image (no extra CA secret)
+        run: docker build -t wap-backend:ci backend
+      - name: Validate compose files, local and cloud
+        run: |
+          cp .env.example .env
+          docker compose config -q
+          mkdir -p "$HOME/.ccr" && touch "$HOME/.ccr/ca-bundle.crt"
+          docker compose -f docker-compose.yml -f docker-compose.cloud.yml config -q
