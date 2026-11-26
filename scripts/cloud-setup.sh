@@ -17,7 +17,7 @@ sleep 5
 # Pre-pull images so they are in the cached snapshot.
 for img in postgres:17 clickhouse/clickhouse-server:25.8 \
            quay.io/keycloak/keycloak:26.4 python:3.13-slim \
-           ghcr.io/astral-sh/uv:0.9; do
+           ghcr.io/astral-sh/uv:0.11; do
   docker pull "$img" &
 done
 wait
