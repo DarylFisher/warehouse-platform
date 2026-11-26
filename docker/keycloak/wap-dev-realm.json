@@ -33,6 +33,18 @@
             "access.token.claim": "true",
             "userinfo.token.claim": "true"
           }
+        },
+        {
+          "name": "wap-api audience",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-audience-mapper",
+          "consentRequired": false,
+          "config": {
+            "included.custom.audience": "wap-api",
+            "id.token.claim": "false",
+            "access.token.claim": "true",
+            "introspection.token.claim": "true"
+          }
         }
       ]
     }
@@ -56,6 +68,16 @@
       "enabled": true,
       "emailVerified": true,
       "groups": ["/tenant-demo-south"],
+      "credentials": [{ "type": "password", "value": "password", "temporary": false }]
+    },
+    {
+      "username": "ops.both",
+      "email": "ops.both@example.com",
+      "firstName": "Ops",
+      "lastName": "Both",
+      "enabled": true,
+      "emailVerified": true,
+      "groups": ["/tenant-demo-north", "/tenant-demo-south"],
       "credentials": [{ "type": "password", "value": "password", "temporary": false }]
     }
   ]

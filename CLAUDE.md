@@ -19,6 +19,7 @@ All from the repo root unless noted (`just --list` shows everything):
 - `just run`: API on the host with hot reload (after `just deps`)
 - `just deps`: only Postgres, ClickHouse, Keycloak (run the API on the host)
 - `just seed`: demo tenants `demo-north` and `demo-south`
+- `just token <user>`: dev access token (`north.admin`, `south.admin`, `ops.both`)
 - `just test`: ruff, pyright (strict), pytest including integration tests
 - `just fmt`: format and auto-fix
 
@@ -35,17 +36,20 @@ Integration tests need `WAP_TEST_DATABASE_URL` and
    use `WAP_MIGRATION_DATABASE_URL` (`wap_owner`).
 3. **Set the tenant only with `wap.db.tenant_transaction`**, which uses a
    transaction-local setting so it cannot leak through the pool.
-4. **No tenant filter needed in queries**: RLS supplies it. Do not add
+4. **The tenant comes only from the verified token's `tenant-<slug>` groups**
+   (ADR 0003). Routes get it through `TenantDep` / `TenantConn`; never read a
+   tenant from the request body or an unchecked header.
+5. **No tenant filter needed in queries**: RLS supplies it. Do not add
    `WHERE tenant_id = ...` as a substitute for RLS.
-5. **Kernel tables are Alembic migrations** in `backend/migrations/versions/`.
+6. **Kernel tables are Alembic migrations** in `backend/migrations/versions/`.
    App-defined tables (M2 onwards) come from the platform migration engine,
    never Alembic.
-6. **ClickHouse tables lead their sort key with `tenant_id`.**
-7. Python 3.13, strict pyright, ruff. Keep `just test` green before finishing.
+7. **ClickHouse tables lead their sort key with `tenant_id`.**
+8. Python 3.13, strict pyright, ruff. Keep `just test` green before finishing.
 
 ## Layout
 
-- `backend/src/wap/kernel/`: tenancy now; identity, metadata, migrations, audit, outbox next
+- `backend/src/wap/kernel/`: tenancy and identity now; metadata, migrations, audit, outbox next
 - `backend/src/wap/api/`: FastAPI routers and dependencies
 - `backend/src/wap/cli/`: seed and maintenance commands
 - `docker/`: init scripts for Postgres, ClickHouse and the Keycloak dev realm

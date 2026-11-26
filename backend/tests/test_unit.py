@@ -26,11 +26,6 @@ async def test_liveness(bare_client: AsyncClient) -> None:
     assert r.json() == {"status": "ok", "version": __version__}
 
 
-async def test_tenant_header_required(bare_client: AsyncClient) -> None:
-    r = await bare_client.get("/api/sites")
-    assert r.status_code == 400
-
-
 @pytest.mark.parametrize(
     ("slug", "valid"),
     [

@@ -20,7 +20,7 @@ Architecture: [Architecture Options](https://claude.ai/artifact/YBdjfyqZQt9eBy8k
 | | Milestone | Status |
 | --- | --- | --- |
 | M0 | Foundations | Done (see below) |
-| M1 | Kernel: tenancy, OIDC identity, audit, outbox, staging on Fly.io | Started: tenancy done |
+| M1 | Kernel: tenancy, OIDC identity, audit, outbox, staging on Fly.io | In progress: tenancy and OIDC login done |
 | M2 | Metadata runtime and migration engine | Not started |
 | M3 | Flows (DBOS) and connectors | Not started |
 | M4 | Plugins | Not started |
@@ -39,7 +39,7 @@ Architecture: [Architecture Options](https://claude.ai/artifact/YBdjfyqZQt9eBy8k
 ## M1 — next steps
 
 - [x] Kernel schema, roles, forced RLS, tenant resolution, isolation tests (pulled forward into M0)
-- [ ] OIDC login: validate Keycloak tokens, map `groups` claim `tenant-<slug>` to tenant; retire `X-Tenant`
+- [x] OIDC login: validate Keycloak tokens, map `groups` claim `tenant-<slug>` to tenant; retire `X-Tenant` ([ADR 0003](adr/0003-identity.md))
 - [ ] Users and roles tables; permission checks on routes
 - [ ] Audit writer (actor, tenant, before/after) on every write
 - [ ] Transactional outbox table and relay skeleton to `wap.platform_events`
@@ -48,3 +48,4 @@ Architecture: [Architecture Options](https://claude.ai/artifact/YBdjfyqZQt9eBy8k
 ## Session notes
 
 - 2026-11-26: M0 built and verified (24 tests passing against Postgres 16 and ClickHouse 25.8 run natively; the Docker images themselves were not run in the build environment, so the first `just up` on a workstation is the first real container run).
+- 2026-11-26: `just up` fixed for cloud sessions ([#1](https://github.com/DarylFisher/warehouse-platform/pull/1)). OIDC login built: the API requires Keycloak access tokens and takes the tenant from `tenant-<slug>` groups; `X-Tenant` only picks among granted tenants. `just token <user>` prints a dev token. Verified end to end against the real Keycloak realm. Next: users and roles tables, keyed by `iss` + `sub`.

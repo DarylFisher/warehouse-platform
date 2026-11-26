@@ -29,14 +29,22 @@ Then open:
 | ClickHouse HTTP | http://localhost:8123/play |
 | Keycloak admin | http://localhost:8180 (admin / admin) |
 
-Try tenant isolation:
+Try tenant isolation. The API needs a Keycloak access token; the dev realm has
+`north.admin`, `south.admin` and `ops.both` (member of both tenants), all with
+password `password`:
 
 ```bash
-curl -H "X-Tenant: demo-north" http://localhost:8100/api/sites
-curl -H "X-Tenant: demo-south" http://localhost:8100/api/sites
+curl -H "Authorization: Bearer $(just token north.admin)" http://localhost:8100/api/sites
+curl -H "Authorization: Bearer $(just token south.admin)" http://localhost:8100/api/sites
 ```
 
-The `X-Tenant` header is a development stand-in until OIDC login lands in M1.
+The tenant comes from the token's `tenant-<slug>` groups. A user in several
+tenants picks one with `X-Tenant`, which must name a tenant the token grants:
+
+```bash
+curl -H "Authorization: Bearer $(just token ops.both)" -H "X-Tenant: demo-south" \
+  http://localhost:8100/api/sites
+```
 
 ## Ports
 
