@@ -1,11 +1,14 @@
 """Tenant isolation: the platform's most important guarantee.
 
+Requests carry signed tokens; the tenant comes only from their tenant groups.
+
 These tests go through the API and straight to the database as the app role,
 so a gap in either the code or the RLS policies fails the build.
 """
 
 import psycopg
 import pytest
+from auth_support import bearer_for
 from httpx import AsyncClient
 from psycopg import AsyncConnection
 from psycopg.rows import DictRow
@@ -20,7 +23,7 @@ Pool = AsyncConnectionPool[AsyncConnection[DictRow]]
 
 
 async def _codes(client: AsyncClient, tenant: str) -> set[str]:
-    r = await client.get("/api/sites", headers={"X-Tenant": tenant})
+    r = await client.get("/api/sites", headers=bearer_for(tenant))
     assert r.status_code == 200, r.text
     return {s["code"] for s in r.json()}
 
@@ -33,16 +36,45 @@ async def test_each_tenant_sees_only_its_own_sites(client: AsyncClient) -> None:
     assert north.isdisjoint(south)
 
 
-async def test_unknown_tenant_is_404(client: AsyncClient) -> None:
-    r = await client.get("/api/sites", headers={"X-Tenant": "no-such-tenant"})
-    assert r.status_code == 404
+async def test_group_for_unknown_tenant_is_403(client: AsyncClient) -> None:
+    r = await client.get("/api/sites", headers=bearer_for("no-such-tenant"))
+    assert r.status_code == 403
+
+
+async def test_no_token_is_401(client: AsyncClient) -> None:
+    for method, body in (("GET", None), ("POST", {"code": "NOAUTH", "name": "x"})):
+        r = await client.request(method, "/api/sites", json=body)
+        assert r.status_code == 401
+        assert r.headers["www-authenticate"] == "Bearer"
+
+
+async def test_x_tenant_cannot_reach_a_tenant_the_token_does_not_grant(
+    client: AsyncClient,
+) -> None:
+    headers = {**bearer_for("demo-north"), "X-Tenant": "demo-south"}
+    r = await client.get("/api/sites", headers=headers)
+    assert r.status_code == 403
+    r = await client.post("/api/sites", json={"code": "XT", "name": "x"}, headers=headers)
+    assert r.status_code == 403
+
+
+async def test_multi_tenant_user_picks_a_granted_tenant(client: AsyncClient) -> None:
+    both = bearer_for("demo-north", "demo-south")
+    r = await client.get("/api/sites", headers=both)
+    assert r.status_code == 400  # ambiguous without a choice
+    north = await client.get("/api/sites", headers={**both, "X-Tenant": "demo-north"})
+    south = await client.get("/api/sites", headers={**both, "X-Tenant": "demo-south"})
+    north_codes = {s["code"] for s in north.json()}
+    south_codes = {s["code"] for s in south.json()}
+    assert "NDC1" in north_codes and "SFC1" in south_codes
+    assert north_codes.isdisjoint(south_codes)
 
 
 async def test_created_site_is_invisible_to_other_tenant(client: AsyncClient) -> None:
     r = await client.post(
         "/api/sites",
         json={"code": "NTEST", "name": "North test"},
-        headers={"X-Tenant": "demo-north"},
+        headers=bearer_for("demo-north"),
     )
     assert r.status_code == 201, r.text
     assert "NTEST" in await _codes(client, "demo-north")
@@ -51,9 +83,9 @@ async def test_created_site_is_invisible_to_other_tenant(client: AsyncClient) ->
 
 async def test_site_codes_are_unique_per_tenant_only(client: AsyncClient) -> None:
     body = {"code": "SHARED", "name": "Same code, two tenants"}
-    north = await client.post("/api/sites", json=body, headers={"X-Tenant": "demo-north"})
-    south = await client.post("/api/sites", json=body, headers={"X-Tenant": "demo-south"})
-    again = await client.post("/api/sites", json=body, headers={"X-Tenant": "demo-north"})
+    north = await client.post("/api/sites", json=body, headers=bearer_for("demo-north"))
+    south = await client.post("/api/sites", json=body, headers=bearer_for("demo-south"))
+    again = await client.post("/api/sites", json=body, headers=bearer_for("demo-north"))
     assert (north.status_code, south.status_code, again.status_code) == (201, 201, 409)
 
 

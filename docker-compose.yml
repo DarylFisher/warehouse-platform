@@ -52,6 +52,10 @@ services:
     environment:
       KC_BOOTSTRAP_ADMIN_USERNAME: admin
       KC_BOOTSTRAP_ADMIN_PASSWORD: ${KEYCLOAK_ADMIN_PASSWORD:-admin}
+      # One public URL, so tokens carry the same issuer whether fetched from
+      # the host or from inside Docker.
+      KC_HOSTNAME: http://localhost:8180
+      KC_HOSTNAME_BACKCHANNEL_DYNAMIC: "true"
     ports: ["8180:8080"]
     volumes:
       - ./docker/keycloak:/opt/keycloak/data/import:ro
@@ -68,6 +72,9 @@ services:
       WAP_CLICKHOUSE_USER: wap
       WAP_CLICKHOUSE_PASSWORD: ${WAP_CLICKHOUSE_PASSWORD:-wap_dev}
       WAP_CLICKHOUSE_DATABASE: wap
+      WAP_OIDC_ISSUER: http://localhost:8180/realms/wap-dev
+      # Signing keys fetched over the Docker network; tokens still name the public issuer.
+      WAP_OIDC_JWKS_URL: http://keycloak:8080/realms/wap-dev/protocol/openid-connect/certs
     depends_on:
       postgres: { condition: service_healthy }
     restart: "no"

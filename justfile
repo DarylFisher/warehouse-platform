@@ -24,6 +24,10 @@ deps:
 run:
     cd backend && uv run alembic upgrade head && uv run uvicorn wap.api.main:app --reload --port 8100
 
+# Print a dev access token for a Keycloak user (north.admin, south.admin, ops.both)
+token user="north.admin":
+    @cd backend && uv run --quiet python -m wap.cli.dev_token {{user}}
+
 # Stop the stack (data volumes are kept)
 down:
     {{compose}} down

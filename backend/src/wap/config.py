@@ -23,9 +23,14 @@ class Settings(BaseSettings):
     clickhouse_password: SecretStr = SecretStr("wap_dev")
     clickhouse_database: str = "wap"
 
-    # Development only: resolve the tenant from the X-Tenant header.
-    # Replaced by OIDC token claims in M1.
-    dev_tenant_header: bool = True
+    # OIDC. The issuer must match the token's `iss` exactly. Signing keys come
+    # from `oidc_jwks_url` when set (e.g. a Docker-internal address), otherwise
+    # from the issuer's discovery document.
+    oidc_issuer: str = "http://localhost:8180/realms/wap-dev"
+    oidc_audience: str = "wap-api"
+    oidc_jwks_url: str | None = None
+    # Group-name prefix that grants access to a tenant: `tenant-<slug>`.
+    oidc_tenant_group_prefix: str = "tenant-"
 
 
 @lru_cache

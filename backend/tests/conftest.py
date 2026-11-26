@@ -13,6 +13,7 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 
 import pytest
+from auth_support import make_verifier
 from httpx import ASGITransport, AsyncClient
 from psycopg import AsyncConnection
 from psycopg.rows import DictRow
@@ -77,6 +78,7 @@ async def client(
     app = create_app()
     app.state.pool = pool
     app.state.clickhouse = None
+    app.state.verifier = make_verifier()
     app.dependency_overrides[get_settings] = lambda: migrated_db
     async with AsyncClient(transport=ASGITransport(app=app), base_url="http://test") as c:
         yield c
