@@ -49,6 +49,13 @@ Integration tests need `WAP_TEST_DATABASE_URL` and
 - `backend/src/wap/cli/`: seed and maintenance commands
 - `docker/`: init scripts for Postgres, ClickHouse and the Keycloak dev realm
 - `docs/adr/`: architecture decisions; add one for each significant choice
+- `scripts/`: cloud environment setup script and the SessionStart hook
+
+## Cloud sessions
+
+The SessionStart hook runs `uv sync` and starts dockerd in cloud sessions.
+Containers are not started automatically: run `just deps` (or `just up`)
+before integration tests. Work on a branch and open a pull request; CI must pass.
 
 ## Local ports
 
