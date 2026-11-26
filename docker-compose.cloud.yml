@@ -1,0 +1,22 @@
+# Overrides for Claude Code cloud sessions. The justfile adds this file
+# automatically when CLAUDE_CODE_REMOTE=true; local runs never use it.
+#
+# - Image builds trust the session's TLS proxy CA (build secret "extra_ca").
+# - ClickHouse's open-file limit fits the sandbox (it allows at most 20000).
+
+services:
+  migrate:
+    build:
+      context: ./backend
+      secrets: [extra_ca]
+  api:
+    build:
+      context: ./backend
+      secrets: [extra_ca]
+  clickhouse:
+    ulimits:
+      nofile: { soft: 20000, hard: 20000 }
+
+secrets:
+  extra_ca:
+    file: ${EXTRA_CA_CERT:-${HOME}/.ccr/ca-bundle.crt}

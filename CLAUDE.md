@@ -16,6 +16,7 @@ app tier, ClickHouse Managed Postgres and ClickHouse Cloud for data.
 All from the repo root unless noted (`just --list` shows everything):
 
 - `just up` / `just down` / `just reset-db`: local stack in Docker
+- `just run`: API on the host with hot reload (after `just deps`)
 - `just deps`: only Postgres, ClickHouse, Keycloak (run the API on the host)
 - `just seed`: demo tenants `demo-north` and `demo-south`
 - `just test`: ruff, pyright (strict), pytest including integration tests
@@ -54,7 +55,9 @@ Integration tests need `WAP_TEST_DATABASE_URL` and
 ## Cloud sessions
 
 The SessionStart hook runs `uv sync` and starts dockerd in cloud sessions.
-Containers are not started automatically: run `just deps` (or `just up`)
+In cloud sessions the justfile also loads `docker-compose.cloud.yml`, which
+passes the session proxy CA into image builds and lowers the ClickHouse file
+limit to fit the sandbox. Containers are not started automatically: run `just deps` (or `just up`)
 before integration tests. Work on a branch and open a pull request; CI must pass.
 
 ## Local ports

@@ -1,6 +1,11 @@
 set dotenv-load := true
 
-compose := "docker compose"
+# Cloud sessions add docker-compose.cloud.yml (proxy CA for builds, sandbox ulimits).
+compose := if env_var_or_default("CLAUDE_CODE_REMOTE", "") == "true" {
+    "docker compose -f docker-compose.yml -f docker-compose.cloud.yml"
+} else {
+    "docker compose"
+}
 
 # List commands
 default:
@@ -14,6 +19,10 @@ up:
 # Start only the backing services, for running the API on the host
 deps:
     {{compose}} up -d postgres clickhouse keycloak
+
+# Run the API on the host with hot reload (start backing services with `just deps`)
+run:
+    cd backend && uv run alembic upgrade head && uv run uvicorn wap.api.main:app --reload --port 8100
 
 # Stop the stack (data volumes are kept)
 down:
