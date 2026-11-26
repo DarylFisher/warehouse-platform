@@ -1,8 +1,8 @@
 """FastAPI dependencies shared by routers."""
 
 import logging
-from collections.abc import AsyncIterator
-from typing import Annotated
+from collections.abc import AsyncIterator, Callable, Coroutine
+from typing import Annotated, Any
 
 from fastapi import Depends, Header, HTTPException, Request, status
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
@@ -11,6 +11,7 @@ from psycopg.rows import DictRow
 from psycopg_pool import AsyncConnectionPool
 
 from wap.db import tenant_transaction
+from wap.kernel.access import Access, Permission, UserDisabledError, load_access
 from wap.kernel.identity import (
     IdentityProviderUnavailableError,
     InvalidTokenError,
@@ -102,6 +103,36 @@ async def tenant_conn(
         yield conn
 
 
+async def current_access(
+    pool: Annotated[Pool, Depends(get_pool)],
+    tenant: Annotated[Tenant, Depends(current_tenant)],
+    principal: Annotated[Principal, Depends(current_principal)],
+) -> Access:
+    """The caller's user and permissions in this tenant, provisioning them on first sign-in.
+
+    Uses its own short transaction, separate from the route's: a 403 from a
+    permission check must not roll back the new user's row, or admins would
+    never see users who are waiting for a role.
+    """
+    try:
+        async with tenant_transaction(pool, tenant.id) as conn:
+            return await load_access(conn, tenant, principal)
+    except UserDisabledError:
+        raise HTTPException(status.HTTP_403_FORBIDDEN, "User is disabled in this tenant") from None
+
+
+def require(permission: Permission) -> Callable[..., Coroutine[Any, Any, Access]]:
+    """Route dependency: 403 unless the caller holds ``permission`` in this tenant."""
+
+    async def check(access: Annotated[Access, Depends(current_access)]) -> Access:
+        if not access.can(permission):
+            raise HTTPException(status.HTTP_403_FORBIDDEN, f"Requires permission {permission}")
+        return access
+
+    return check
+
+
 PrincipalDep = Annotated[Principal, Depends(current_principal)]
 TenantDep = Annotated[Tenant, Depends(current_tenant)]
 TenantConn = Annotated[AsyncConnection[DictRow], Depends(tenant_conn)]
+AccessDep = Annotated[Access, Depends(current_access)]

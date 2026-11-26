@@ -7,7 +7,7 @@ import httpx
 from fastapi import FastAPI
 
 from wap import __version__
-from wap.api import health, me, sites
+from wap.api import health, me, sites, users
 from wap.config import Settings, get_settings
 from wap.db import create_pool
 from wap.kernel.identity import JwksCache, TokenVerifier, http_jwks_fetcher
@@ -47,6 +47,7 @@ def create_app() -> FastAPI:
     app.include_router(health.router)
     app.include_router(me.router)
     app.include_router(sites.router)
+    app.include_router(users.router)
     return app
 
 

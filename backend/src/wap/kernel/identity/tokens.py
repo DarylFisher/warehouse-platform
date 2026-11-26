@@ -29,6 +29,7 @@ class IdentityProviderUnavailableError(Exception):
 
 @dataclass(frozen=True, slots=True)
 class Principal:
+    issuer: str
     subject: str
     email: str | None
     name: str | None
@@ -178,6 +179,7 @@ class TokenVerifier:
         email = claims.get("email")
         name = claims.get("name")
         return Principal(
+            issuer=self.issuer,
             subject=str(claims["sub"]),
             email=email if isinstance(email, str) else None,
             name=name if isinstance(name, str) else None,

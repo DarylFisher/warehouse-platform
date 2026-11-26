@@ -13,7 +13,7 @@ from collections.abc import AsyncIterator
 from pathlib import Path
 
 import pytest
-from auth_support import make_verifier
+from auth_support import TEST_ISSUER, make_verifier
 from httpx import ASGITransport, AsyncClient
 from psycopg import AsyncConnection
 from psycopg.rows import DictRow
@@ -57,7 +57,7 @@ def test_settings() -> Settings:
 def migrated_db(test_settings: Settings) -> Settings:
     _alembic("downgrade", "base")
     _alembic("upgrade", "head")
-    seed(test_settings.migration_database_url)
+    seed(test_settings.migration_database_url, TEST_ISSUER)
     return test_settings
 
 

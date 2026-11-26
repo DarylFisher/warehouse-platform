@@ -38,6 +38,15 @@ curl -H "Authorization: Bearer $(just token north.admin)" http://localhost:8100/
 curl -H "Authorization: Bearer $(just token south.admin)" http://localhost:8100/api/sites
 ```
 
+`just seed` makes `north.admin` and `south.admin` admins of their tenants, and
+`ops.both` a viewer in `demo-north` and an operator in `demo-south`. Anyone else
+who signs in gets no roles until an admin grants one (`PUT /api/users/{id}/roles`).
+`GET /api/me/access` shows your roles and permissions in the current tenant.
+
+Keycloak imports the dev realm only when its container is created. After the
+realm file changes, run `just down && just up` (Keycloak keeps no volume, so
+this re-imports it), then `just seed`.
+
 The tenant comes from the token's `tenant-<slug>` groups. A user in several
 tenants picks one with `X-Tenant`, which must name a tenant the token grants:
 

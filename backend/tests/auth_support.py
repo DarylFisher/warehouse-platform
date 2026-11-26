@@ -9,6 +9,7 @@ import jwt
 from cryptography.hazmat.primitives.asymmetric import rsa
 from jwt.algorithms import RSAAlgorithm
 
+from wap.cli.seed import DEV_USERS
 from wap.kernel.identity import JwksCache, TokenVerifier
 
 TEST_ISSUER = "https://issuer.test/realms/wap"
@@ -59,7 +60,21 @@ def mint_token(
     return jwt.encode(payload, key, algorithm=alg, headers={"kid": kid})
 
 
-def bearer_for(*slugs: str) -> dict[str, str]:
-    """Authorization header for a user in the given tenants' groups."""
-    token = mint_token(groups=[f"tenant-{s}" for s in slugs], sub=f"user-{'-'.join(slugs)}")
+def bearer_for(*slugs: str, sub: str | None = None, **claims: Any) -> dict[str, str]:
+    """Authorization header for a user in the given tenants' groups.
+
+    Unless ``sub`` names a seeded user, this user has no roles yet: the first
+    request provisions them with none.
+    """
+    subject = sub or f"user-{'-'.join(slugs)}"
+    token = mint_token(groups=[f"tenant-{s}" for s in slugs], sub=subject, **claims)
+    return {"Authorization": f"Bearer {token}"}
+
+
+def bearer_as(username: str) -> dict[str, str]:
+    """Authorization header for a seeded dev user (see wap.cli.seed.DEV_USERS)."""
+    subject, email, name, grants = DEV_USERS[username]
+    token = mint_token(
+        groups=[f"tenant-{slug}" for slug in grants], sub=subject, email=email, name=name
+    )
     return {"Authorization": f"Bearer {token}"}
