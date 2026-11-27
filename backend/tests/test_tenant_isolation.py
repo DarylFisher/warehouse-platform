@@ -94,7 +94,13 @@ async def test_site_codes_are_unique_per_tenant_only(client: AsyncClient) -> Non
 
 async def test_no_tenant_set_means_no_rows(pool: Pool) -> None:
     async with pool.connection() as conn:
-        for table in ("kernel.sites", "kernel.tenants", "kernel.users", "kernel.user_roles"):
+        for table in (
+            "kernel.sites",
+            "kernel.tenants",
+            "kernel.users",
+            "kernel.user_roles",
+            "kernel.audit_log",
+        ):
             cur = await conn.execute(f"SELECT count(*) AS n FROM {table}")  # noqa: S608
             row = await cur.fetchone()
             assert row is not None and row["n"] == 0, table
@@ -241,3 +247,35 @@ async def test_app_role_cannot_delete_users(pool: Pool) -> None:
     with pytest.raises(psycopg.errors.InsufficientPrivilege):
         async with tenant_transaction(pool, north.id) as conn:
             await conn.execute("DELETE FROM kernel.users")
+
+
+# --- audit log ------------------------------------------------------------------
+
+
+async def test_audit_log_shows_only_own_tenant(client: AsyncClient) -> None:
+    r = await client.post(
+        "/api/sites", json={"code": "AUDISO", "name": "x"}, headers=bearer_as("south.admin")
+    )
+    assert r.status_code == 201
+    south_site = r.json()["id"]
+    r = await client.get("/api/audit", headers=bearer_as("north.admin"), params={"limit": 200})
+    assert r.status_code == 200
+    assert south_site not in {e["row_id"] for e in r.json()}
+    r = await client.get(
+        "/api/audit", headers=bearer_as("north.admin"), params={"row_id": south_site}
+    )
+    assert r.json() == []
+
+
+async def test_app_role_cannot_write_the_audit_log(pool: Pool) -> None:
+    async with pool.connection() as conn:
+        north = await resolve_tenant(conn, "demo-north")
+    for sql in (
+        "INSERT INTO kernel.audit_log (tenant_id, action, table_name) "
+        "VALUES (kernel.current_tenant_id(), 'insert', 'forged')",
+        "UPDATE kernel.audit_log SET actor_subject = 'someone-else'",
+        "DELETE FROM kernel.audit_log",
+    ):
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            async with tenant_transaction(pool, north.id) as conn:
+                await conn.execute(sql)

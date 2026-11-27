@@ -8,6 +8,7 @@ class Permission(StrEnum):
     SITES_WRITE = "sites.write"
     USERS_READ = "users.read"
     USERS_MANAGE = "users.manage"
+    AUDIT_READ = "audit.read"
 
 
 ADMIN_ROLE = "admin"

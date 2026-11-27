@@ -9,6 +9,7 @@ from psycopg.rows import DictRow, dict_row
 from psycopg_pool import AsyncConnectionPool
 
 from wap.config import Settings
+from wap.kernel.audit import Actor
 
 
 def create_pool(settings: Settings) -> AsyncConnectionPool[AsyncConnection[DictRow]]:
@@ -24,13 +25,28 @@ def create_pool(settings: Settings) -> AsyncConnectionPool[AsyncConnection[DictR
 
 @asynccontextmanager
 async def tenant_transaction(
-    pool: AsyncConnectionPool[AsyncConnection[DictRow]], tenant_id: UUID
+    pool: AsyncConnectionPool[AsyncConnection[DictRow]],
+    tenant_id: UUID,
+    actor: Actor | None = None,
 ) -> AsyncGenerator[AsyncConnection[DictRow]]:
     """Open a transaction with the tenant set for row level security.
 
-    The setting is transaction-local (``is_local = true``), so it can never leak
-    to the next request that reuses the pooled connection.
+    ``actor`` is recorded on every audit entry the transaction causes.
+
+    The settings are transaction-local (``is_local = true``), so they can never
+    leak to the next request that reuses the pooled connection.
     """
     async with pool.connection() as conn, conn.transaction():
-        await conn.execute("SELECT set_config('app.tenant_id', %s, true)", (str(tenant_id),))
+        await conn.execute(
+            """
+            SELECT set_config('app.tenant_id', %s, true),
+                   set_config('app.actor_user_id', %s, true),
+                   set_config('app.actor_subject', %s, true)
+            """,
+            (
+                str(tenant_id),
+                str(actor.user_id) if actor and actor.user_id else "",
+                actor.subject if actor else "",
+            ),
+        )
         yield conn

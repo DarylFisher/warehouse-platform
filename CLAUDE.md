@@ -30,7 +30,8 @@ Integration tests need `WAP_TEST_DATABASE_URL` and
 
 1. **Tenant isolation.** Every tenant-scoped table has `tenant_id`, RLS ENABLED
    and FORCED, and a policy on `kernel.current_tenant_id()`. Grant the app role
-   per table, never through default privileges. Add tests to
+   per table, never through default privileges. Attach the audit trigger
+   (`wap.kernel.audit.attach_sql`, ADR 0005). Add tests to
    `tests/test_tenant_isolation.py` for every new tenant-scoped table.
 2. **The app connects as `wap_app`**, never as the owner. Migrations and seeds
    use `WAP_MIGRATION_DATABASE_URL` (`wap_owner`).
@@ -52,7 +53,7 @@ Integration tests need `WAP_TEST_DATABASE_URL` and
 
 ## Layout
 
-- `backend/src/wap/kernel/`: tenancy, identity and access now; metadata, migrations, audit, outbox next
+- `backend/src/wap/kernel/`: tenancy, identity, access and audit now; metadata, migrations, outbox next
 - `backend/src/wap/api/`: FastAPI routers and dependencies
 - `backend/src/wap/cli/`: seed and maintenance commands
 - `docker/`: init scripts for Postgres, ClickHouse and the Keycloak dev realm

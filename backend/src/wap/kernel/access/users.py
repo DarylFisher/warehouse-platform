@@ -23,6 +23,7 @@ class Access:
     """Who is acting, in which tenant, and what they may do there."""
 
     user_id: UUID
+    subject: str
     tenant: Tenant
     roles: frozenset[str]
     permissions: frozenset[str]
@@ -85,6 +86,7 @@ async def load_access(
         permissions.update(row["permissions"])
     return Access(
         user_id=user_id,
+        subject=principal.subject,
         tenant=tenant,
         roles=frozenset(roles),
         permissions=frozenset(permissions),

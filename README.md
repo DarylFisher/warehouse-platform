@@ -42,6 +42,8 @@ curl -H "Authorization: Bearer $(just token south.admin)" http://localhost:8100/
 `ops.both` a viewer in `demo-north` and an operator in `demo-south`. Anyone else
 who signs in gets no roles until an admin grants one (`PUT /api/users/{id}/roles`).
 `GET /api/me/access` shows your roles and permissions in the current tenant.
+Every change to sites, users and roles is recorded with who made it, before and
+after; admins read it at `GET /api/audit`.
 
 Keycloak imports the dev realm only when its container is created. After the
 realm file changes, run `just down && just up` (Keycloak keeps no volume, so

@@ -93,7 +93,11 @@ def seed(conninfo: str, issuer: str) -> None:
                 ).fetchone()
                 assert row is not None
                 tenant_id = row[0]
-                conn.execute("SELECT set_config('app.tenant_id', %s, true)", (str(tenant_id),))
+                conn.execute(
+                    "SELECT set_config('app.tenant_id', %s, true), "
+                    "set_config('app.actor_subject', 'system:seed', true)",
+                    (str(tenant_id),),
+                )
                 for code, site_name in sites:
                     conn.execute(
                         """
