@@ -12,6 +12,7 @@ from psycopg_pool import AsyncConnectionPool
 
 from wap.db import tenant_transaction
 from wap.kernel.access import Access, Permission, UserDisabledError, load_access
+from wap.kernel.audit import Actor
 from wap.kernel.identity import (
     IdentityProviderUnavailableError,
     InvalidTokenError,
@@ -95,14 +96,6 @@ async def current_tenant(
             raise HTTPException(status.HTTP_403_FORBIDDEN, "Tenant not available") from None
 
 
-async def tenant_conn(
-    pool: Annotated[Pool, Depends(get_pool)],
-    tenant: Annotated[Tenant, Depends(current_tenant)],
-) -> AsyncIterator[AsyncConnection[DictRow]]:
-    async with tenant_transaction(pool, tenant.id) as conn:
-        yield conn
-
-
 async def current_access(
     pool: Annotated[Pool, Depends(get_pool)],
     tenant: Annotated[Tenant, Depends(current_tenant)],
@@ -115,10 +108,22 @@ async def current_access(
     never see users who are waiting for a role.
     """
     try:
-        async with tenant_transaction(pool, tenant.id) as conn:
+        # No user id yet on a first sign-in: the subject identifies the actor.
+        actor = Actor(user_id=None, subject=principal.subject)
+        async with tenant_transaction(pool, tenant.id, actor) as conn:
             return await load_access(conn, tenant, principal)
     except UserDisabledError:
         raise HTTPException(status.HTTP_403_FORBIDDEN, "User is disabled in this tenant") from None
+
+
+async def tenant_conn(
+    pool: Annotated[Pool, Depends(get_pool)],
+    access: Annotated[Access, Depends(current_access)],
+) -> AsyncIterator[AsyncConnection[DictRow]]:
+    """The request's tenant transaction, acting as the signed-in user for audit."""
+    actor = Actor(user_id=access.user_id, subject=access.subject)
+    async with tenant_transaction(pool, access.tenant.id, actor) as conn:
+        yield conn
 
 
 def require(permission: Permission) -> Callable[..., Coroutine[Any, Any, Access]]:
