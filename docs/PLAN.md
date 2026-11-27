@@ -20,7 +20,7 @@ Architecture: [Architecture Options](https://claude.ai/artifact/YBdjfyqZQt9eBy8k
 | | Milestone | Status |
 | --- | --- | --- |
 | M0 | Foundations | Done (see below) |
-| M1 | Kernel: tenancy, OIDC identity, audit, outbox, staging on Fly.io | In progress: tenancy, OIDC login, users and roles, audit done |
+| M1 | Kernel: tenancy, OIDC identity, audit, outbox, staging on Fly.io | In progress: all but staging on Fly.io done |
 | M2 | Metadata runtime and migration engine | Not started |
 | M3 | Flows (DBOS) and connectors | Not started |
 | M4 | Plugins | Not started |
@@ -42,7 +42,7 @@ Architecture: [Architecture Options](https://claude.ai/artifact/YBdjfyqZQt9eBy8k
 - [x] OIDC login: validate Keycloak tokens, map `groups` claim `tenant-<slug>` to tenant; retire `X-Tenant` ([ADR 0003](adr/0003-identity.md))
 - [x] Users and roles tables; permission checks on routes ([ADR 0004](adr/0004-users-and-roles.md))
 - [x] Audit writer (actor, tenant, before/after) on every write ([ADR 0005](adr/0005-audit-log.md))
-- [ ] Transactional outbox table and relay skeleton to `wap.platform_events`
+- [x] Transactional outbox table and relay skeleton to `wap.platform_events` ([ADR 0006](adr/0006-outbox.md))
 - [ ] Staging on Fly.io
 
 ## Session notes
@@ -51,3 +51,4 @@ Architecture: [Architecture Options](https://claude.ai/artifact/YBdjfyqZQt9eBy8k
 - 2026-11-26: `just up` fixed for cloud sessions ([#1](https://github.com/DarylFisher/warehouse-platform/pull/1)). OIDC login built: the API requires Keycloak access tokens and takes the tenant from `tenant-<slug>` groups; `X-Tenant` only picks among granted tenants. `just token <user>` prints a dev token. Verified end to end against the real Keycloak realm. Next: users and roles tables, keyed by `iss` + `sub`.
 - 2026-11-26: OIDC login merged ([#2](https://github.com/DarylFisher/warehouse-platform/pull/2)). Users and roles built: tenant-scoped users provisioned on first sign-in with no roles; built-in `admin`, `operator`, `viewer` roles; routes declare permissions with `require(...)`; user and role management API; a tenant always keeps an active admin. Verified with real Keycloak tokens. Next: audit writer.
 - 2026-11-27: Users and roles merged ([#3](https://github.com/DarylFisher/warehouse-platform/pull/3)). Audit writer built: a trigger on sites, users and user roles writes `kernel.audit_log` in the same transaction, with the actor from `tenant_transaction`; append-only and readable only with `audit.read`. Verified live with Keycloak tokens. Next: transactional outbox and relay to `wap.platform_events`, which will also ship audit entries to ClickHouse.
+- 2026-11-27: Audit writer merged ([#4](https://github.com/DarylFisher/warehouse-platform/pull/4)). Outbox built: `kernel.outbox` written in the change's transaction (by `emit` and by a trigger on every audit entry); the `worker` service relays to ClickHouse `wap.platform_events` as the new `wap_relay` role, at-least-once with idempotent inserts. Existing volumes need `just db-roles`. Verified live: a site created through the API reached ClickHouse within a second. Next: staging on Fly.io, the last M1 step.

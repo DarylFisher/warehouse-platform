@@ -14,6 +14,10 @@ class Settings(BaseSettings):
     # Migrations and seeding run as the schema owner.
     migration_database_url: str = "postgresql://wap_owner:wap_owner_dev@localhost:5433/wap"
 
+    # The outbox relay connects as a role that can read and mark outbox events only.
+    relay_database_url: str = "postgresql://wap_relay:wap_relay_dev@localhost:5433/wap"
+    relay_batch_size: int = 500
+
     db_pool_min_size: int = 1
     db_pool_max_size: int = 10
 

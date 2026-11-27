@@ -45,6 +45,11 @@ who signs in gets no roles until an admin grants one (`PUT /api/users/{id}/roles
 Every change to sites, users and roles is recorded with who made it, before and
 after; admins read it at `GET /api/audit`.
 
+Changes also produce events (`site.created`, and `audit.recorded` for every audit
+entry) in a transactional outbox. The `worker` service ships them to ClickHouse
+`wap.platform_events`. If your Postgres volume predates the outbox, run
+`just db-roles` once to add the relay's database role.
+
 Keycloak imports the dev realm only when its container is created. After the
 realm file changes, run `just down && just up` (Keycloak keeps no volume, so
 this re-imports it), then `just seed`.

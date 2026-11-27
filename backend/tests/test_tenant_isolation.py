@@ -279,3 +279,59 @@ async def test_app_role_cannot_write_the_audit_log(pool: Pool) -> None:
         with pytest.raises(psycopg.errors.InsufficientPrivilege):
             async with tenant_transaction(pool, north.id) as conn:
                 await conn.execute(sql)
+
+
+# --- outbox ---------------------------------------------------------------------
+
+
+async def test_app_role_cannot_read_the_outbox(pool: Pool) -> None:
+    async with pool.connection() as conn:
+        north = await resolve_tenant(conn, "demo-north")
+    with pytest.raises(psycopg.errors.InsufficientPrivilege):
+        async with tenant_transaction(pool, north.id) as conn:
+            await conn.execute("SELECT count(*) FROM kernel.outbox")
+
+
+async def test_cannot_emit_an_event_for_another_tenant(pool: Pool) -> None:
+    async with pool.connection() as conn:
+        north = await resolve_tenant(conn, "demo-north")
+        south = await resolve_tenant(conn, "demo-south")
+    with pytest.raises(psycopg.errors.InsufficientPrivilege):
+        async with tenant_transaction(pool, north.id) as conn:
+            await conn.execute(
+                "INSERT INTO kernel.outbox (tenant_id, event_type, payload) "
+                "VALUES (%s, 'site.created', '{}')",
+                (south.id,),
+            )
+
+
+async def test_cannot_emit_without_a_tenant(pool: Pool) -> None:
+    from wap.kernel.outbox import emit
+
+    async with pool.connection() as conn:
+        # Row level security refuses it (the policy check runs before NOT NULL).
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            async with conn.transaction():
+                await emit(conn, "site.created", {})
+
+
+def test_relay_reads_every_tenant_but_nothing_else(
+    relay_conn: psycopg.Connection[tuple[object, ...]],
+) -> None:
+    tenants = relay_conn.execute("SELECT count(DISTINCT tenant_id) FROM kernel.outbox").fetchone()
+    assert tenants is not None and int(str(tenants[0])) >= 2  # seeded events from both tenants
+    for table in ("kernel.sites", "kernel.users", "kernel.audit_log", "kernel.tenants"):
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            relay_conn.execute(f"SELECT 1 FROM {table} LIMIT 1")  # noqa: S608
+
+
+def test_relay_can_only_mark_events(relay_conn: psycopg.Connection[tuple[object, ...]]) -> None:
+    for sql in (
+        "UPDATE kernel.outbox SET payload = '{}'",
+        "UPDATE kernel.outbox SET tenant_id = gen_random_uuid()",
+        "DELETE FROM kernel.outbox",
+        "INSERT INTO kernel.outbox (tenant_id, event_type, payload) "
+        "SELECT tenant_id, 'site.created', '{}' FROM kernel.outbox LIMIT 1",
+    ):
+        with pytest.raises(psycopg.errors.InsufficientPrivilege):
+            relay_conn.execute(sql)
