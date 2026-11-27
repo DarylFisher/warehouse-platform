@@ -39,17 +39,20 @@ Integration tests need `WAP_TEST_DATABASE_URL` and
 4. **The tenant comes only from the verified token's `tenant-<slug>` groups**
    (ADR 0003). Routes get it through `TenantDep` / `TenantConn`; never read a
    tenant from the request body or an unchecked header.
-5. **No tenant filter needed in queries**: RLS supplies it. Do not add
+5. **Every tenant route declares a permission** with
+   `Depends(require(Permission.X))` (ADR 0004). New permissions go in
+   `wap.kernel.access.Permission` and the built-in roles migration together.
+6. **No tenant filter needed in queries**: RLS supplies it. Do not add
    `WHERE tenant_id = ...` as a substitute for RLS.
-6. **Kernel tables are Alembic migrations** in `backend/migrations/versions/`.
+7. **Kernel tables are Alembic migrations** in `backend/migrations/versions/`.
    App-defined tables (M2 onwards) come from the platform migration engine,
    never Alembic.
-7. **ClickHouse tables lead their sort key with `tenant_id`.**
-8. Python 3.13, strict pyright, ruff. Keep `just test` green before finishing.
+8. **ClickHouse tables lead their sort key with `tenant_id`.**
+9. Python 3.13, strict pyright, ruff. Keep `just test` green before finishing.
 
 ## Layout
 
-- `backend/src/wap/kernel/`: tenancy and identity now; metadata, migrations, audit, outbox next
+- `backend/src/wap/kernel/`: tenancy, identity and access now; metadata, migrations, audit, outbox next
 - `backend/src/wap/api/`: FastAPI routers and dependencies
 - `backend/src/wap/cli/`: seed and maintenance commands
 - `docker/`: init scripts for Postgres, ClickHouse and the Keycloak dev realm

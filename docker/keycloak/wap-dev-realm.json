@@ -51,6 +51,7 @@
   ],
   "users": [
     {
+      "id": "8f6d2c1e-4b7a-4e0f-9a51-1d2e3f4a5b01",
       "username": "north.admin",
       "email": "north.admin@example.com",
       "firstName": "North",
@@ -61,6 +62,7 @@
       "credentials": [{ "type": "password", "value": "password", "temporary": false }]
     },
     {
+      "id": "8f6d2c1e-4b7a-4e0f-9a51-1d2e3f4a5b02",
       "username": "south.admin",
       "email": "south.admin@example.com",
       "firstName": "South",
@@ -71,6 +73,7 @@
       "credentials": [{ "type": "password", "value": "password", "temporary": false }]
     },
     {
+      "id": "8f6d2c1e-4b7a-4e0f-9a51-1d2e3f4a5b03",
       "username": "ops.both",
       "email": "ops.both@example.com",
       "firstName": "Ops",
