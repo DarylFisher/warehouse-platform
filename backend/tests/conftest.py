@@ -9,9 +9,10 @@ kernel schema from scratch, so tests never depend on leftover data.
 import os
 import subprocess
 import sys
-from collections.abc import AsyncIterator
+from collections.abc import AsyncIterator, Iterator
 from pathlib import Path
 
+import psycopg
 import pytest
 from auth_support import TEST_ISSUER, make_verifier
 from httpx import ASGITransport, AsyncClient
@@ -28,6 +29,10 @@ BACKEND_DIR = Path(__file__).resolve().parent.parent
 
 TEST_DB_URL = os.environ.get("WAP_TEST_DATABASE_URL")
 TEST_OWNER_URL = os.environ.get("WAP_TEST_MIGRATION_DATABASE_URL")
+# The relay role; derived from the app URL when not given explicitly.
+TEST_RELAY_URL = os.environ.get("WAP_TEST_RELAY_DATABASE_URL") or (
+    TEST_DB_URL.replace("wap_app:wap_app_dev@", "wap_relay:wap_relay_dev@") if TEST_DB_URL else None
+)
 
 
 def pytest_collection_modifyitems(config: pytest.Config, items: list[pytest.Item]) -> None:
@@ -51,6 +56,14 @@ def _alembic(*args: str) -> None:
 def test_settings() -> Settings:
     assert TEST_DB_URL and TEST_OWNER_URL
     return Settings(database_url=TEST_DB_URL, migration_database_url=TEST_OWNER_URL)
+
+
+@pytest.fixture
+def relay_conn(migrated_db: Settings) -> Iterator[psycopg.Connection[tuple[object, ...]]]:
+    """A connection as the outbox relay role (autocommit; relay_batch opens transactions)."""
+    assert TEST_RELAY_URL
+    with psycopg.connect(TEST_RELAY_URL, autocommit=True) as conn:
+        yield conn
 
 
 @pytest.fixture(scope="session")

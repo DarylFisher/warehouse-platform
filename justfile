@@ -41,6 +41,14 @@ reset-db:
 migrate:
     {{compose}} run --rm migrate
 
+# Add database roles introduced since the Postgres volume was created (safe to re-run)
+db-roles:
+    {{compose}} exec -T postgres bash /docker-entrypoint-initdb.d/01-roles-and-databases.sh
+
+# Run the outbox relay on the host (ships events to ClickHouse)
+relay:
+    cd backend && uv run python -m wap.cli.relay
+
 # Create two demo tenants with sample data
 seed:
     {{compose}} run --rm migrate python -m wap.cli.seed

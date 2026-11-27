@@ -15,6 +15,7 @@ services:
       POSTGRES_PASSWORD: ${POSTGRES_SUPERUSER_PASSWORD:-postgres}
       WAP_OWNER_PASSWORD: ${WAP_OWNER_PASSWORD:-wap_owner_dev}
       WAP_APP_PASSWORD: ${WAP_APP_PASSWORD:-wap_app_dev}
+      WAP_RELAY_PASSWORD: ${WAP_RELAY_PASSWORD:-wap_relay_dev}
     ports: ["5433:5432"]
     volumes:
       - pgdata:/var/lib/postgresql/data
@@ -67,6 +68,7 @@ services:
     environment: &backend-env
       WAP_DATABASE_URL: postgresql://wap_app:${WAP_APP_PASSWORD:-wap_app_dev}@postgres:5432/wap
       WAP_MIGRATION_DATABASE_URL: postgresql://wap_owner:${WAP_OWNER_PASSWORD:-wap_owner_dev}@postgres:5432/wap
+      WAP_RELAY_DATABASE_URL: postgresql://wap_relay:${WAP_RELAY_PASSWORD:-wap_relay_dev}@postgres:5432/wap
       WAP_CLICKHOUSE_HOST: clickhouse
       WAP_CLICKHOUSE_PORT: "8123"
       WAP_CLICKHOUSE_USER: wap
@@ -89,6 +91,18 @@ services:
     depends_on:
       migrate: { condition: service_completed_successfully }
       clickhouse: { condition: service_healthy }
+
+  # Outbox relay: ships committed events to ClickHouse.
+  worker:
+    build: ./backend
+    command: ["python", "-m", "wap.cli.relay"]
+    environment: *backend-env
+    volumes:
+      - ./backend/src:/app/src
+    depends_on:
+      migrate: { condition: service_completed_successfully }
+      clickhouse: { condition: service_healthy }
+    restart: unless-stopped
 
 volumes:
   pgdata:

@@ -14,6 +14,7 @@ from pydantic import BaseModel, Field
 
 from wap.api.deps import TenantConn, require
 from wap.kernel.access import Access, Permission
+from wap.kernel.outbox import emit
 
 router = APIRouter(prefix="/api/sites", tags=["sites"])
 
@@ -53,4 +54,6 @@ async def create_site(
         raise HTTPException(status.HTTP_409_CONFLICT, "Site code already exists") from None
     row = await cur.fetchone()
     assert row is not None
-    return Site.model_validate(row)
+    site = Site.model_validate(row)
+    await emit(conn, "site.created", {"site_id": str(site.id), "code": site.code})
+    return site

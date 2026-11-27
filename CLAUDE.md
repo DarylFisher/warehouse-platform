@@ -20,6 +20,8 @@ All from the repo root unless noted (`just --list` shows everything):
 - `just deps`: only Postgres, ClickHouse, Keycloak (run the API on the host)
 - `just seed`: demo tenants `demo-north` and `demo-south`
 - `just token <user>`: dev access token (`north.admin`, `south.admin`, `ops.both`)
+- `just relay`: outbox relay on the host (Docker runs it as the `worker` service)
+- `just db-roles`: add database roles introduced since your Postgres volume was created
 - `just test`: ruff, pyright (strict), pytest including integration tests
 - `just fmt`: format and auto-fix
 
@@ -31,10 +33,12 @@ Integration tests need `WAP_TEST_DATABASE_URL` and
 1. **Tenant isolation.** Every tenant-scoped table has `tenant_id`, RLS ENABLED
    and FORCED, and a policy on `kernel.current_tenant_id()`. Grant the app role
    per table, never through default privileges. Attach the audit trigger
-   (`wap.kernel.audit.attach_sql`, ADR 0005). Add tests to
+   (`wap.kernel.audit.attach_sql`, ADR 0005); only the audit log and outbox
+   themselves are exempt. Add tests to
    `tests/test_tenant_isolation.py` for every new tenant-scoped table.
 2. **The app connects as `wap_app`**, never as the owner. Migrations and seeds
-   use `WAP_MIGRATION_DATABASE_URL` (`wap_owner`).
+   use `WAP_MIGRATION_DATABASE_URL` (`wap_owner`); the outbox relay uses
+   `wap_relay`, which can touch only the outbox (ADR 0006).
 3. **Set the tenant only with `wap.db.tenant_transaction`**, which uses a
    transaction-local setting so it cannot leak through the pool.
 4. **The tenant comes only from the verified token's `tenant-<slug>` groups**
@@ -43,19 +47,21 @@ Integration tests need `WAP_TEST_DATABASE_URL` and
 5. **Every tenant route declares a permission** with
    `Depends(require(Permission.X))` (ADR 0004). New permissions go in
    `wap.kernel.access.Permission` and the built-in roles migration together.
-6. **No tenant filter needed in queries**: RLS supplies it. Do not add
+6. **Events leave Postgres only through the outbox**: `wap.kernel.outbox.emit`
+   on the request's `TenantConn`. Never write to ClickHouse from a request.
+7. **No tenant filter needed in queries**: RLS supplies it. Do not add
    `WHERE tenant_id = ...` as a substitute for RLS.
-7. **Kernel tables are Alembic migrations** in `backend/migrations/versions/`.
+8. **Kernel tables are Alembic migrations** in `backend/migrations/versions/`.
    App-defined tables (M2 onwards) come from the platform migration engine,
    never Alembic.
-8. **ClickHouse tables lead their sort key with `tenant_id`.**
-9. Python 3.13, strict pyright, ruff. Keep `just test` green before finishing.
+9. **ClickHouse tables lead their sort key with `tenant_id`.**
+10. Python 3.13, strict pyright, ruff. Keep `just test` green before finishing.
 
 ## Layout
 
-- `backend/src/wap/kernel/`: tenancy, identity, access and audit now; metadata, migrations, outbox next
+- `backend/src/wap/kernel/`: tenancy, identity, access, audit and outbox now; metadata and migrations next
 - `backend/src/wap/api/`: FastAPI routers and dependencies
-- `backend/src/wap/cli/`: seed and maintenance commands
+- `backend/src/wap/cli/`: seed, relay worker and maintenance commands
 - `docker/`: init scripts for Postgres, ClickHouse and the Keycloak dev realm
 - `docs/adr/`: architecture decisions; add one for each significant choice
 - `scripts/`: cloud environment setup script and the SessionStart hook

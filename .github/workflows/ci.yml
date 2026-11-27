@@ -37,6 +37,7 @@ jobs:
     env:
       WAP_TEST_DATABASE_URL: postgresql://wap_app:wap_app_dev@localhost:5433/wap_test
       WAP_TEST_MIGRATION_DATABASE_URL: postgresql://wap_owner:wap_owner_dev@localhost:5433/wap_test
+      WAP_TEST_RELAY_DATABASE_URL: postgresql://wap_relay:wap_relay_dev@localhost:5433/wap_test
       WAP_CLICKHOUSE_HOST: localhost
       WAP_CLICKHOUSE_PASSWORD: wap_dev
 
@@ -55,6 +56,7 @@ jobs:
           POSTGRES_USER: postgres
           WAP_OWNER_PASSWORD: wap_owner_dev
           WAP_APP_PASSWORD: wap_app_dev
+          WAP_RELAY_PASSWORD: wap_relay_dev
         run: bash docker/postgres/init/01-roles-and-databases.sh
 
       - run: uv sync --frozen
